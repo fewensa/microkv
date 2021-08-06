@@ -55,7 +55,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use indexmap::IndexMap;
 use secstr::{SecStr, SecVec};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -63,6 +62,8 @@ use sodiumoxide::crypto::hash::sha256;
 use sodiumoxide::crypto::secretbox::{self, Nonce};
 
 use crate::errors::{ErrorType, KVError, Result};
+use crate::migrate::history::KV;
+use crate::migrate::{self, Migrate};
 use crate::namespace::NamespaceMicrokv;
 
 /// Defines the directory path where a key-value store
@@ -72,30 +73,8 @@ const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
 /// An alias to a base data structure that supports storing
 /// associated types. An `IndexMap` is a strong choice due to
 /// strong asymptotic performance with sorted key iteration.
-pub(crate) type KV = IndexMap<String, SecVec<u8>>;
-type STORAGE = Arc<RwLock<KV>>;
 
-/// Defines the main interface structure to represent the most
-/// recent state of the data store.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct MicroKV {
-    /// The version of persist data. this field will help migrate
-    version: String,
-    path: PathBuf,
-
-    /// stores the actual key-value store encapsulated with a RwLock
-    storage: Arc<RwLock<HashMap<String, STORAGE>>>,
-
-    /// pseudorandom nonce that can be publicly known
-    nonce: Nonce,
-
-    /// memory-guarded hashed password
-    #[serde(skip_serializing, skip_deserializing)]
-    pwd: Option<SecStr>,
-
-    /// is auto commit
-    is_auto_commit: bool,
-}
+pub type MicroKV = migrate::history::MicroKV027;
 
 impl MicroKV {
     /// New MicroKV store with store to base path
@@ -136,12 +115,8 @@ impl MicroKV {
         let path = MicroKV::get_db_path_with_base_path(dbname.as_ref(), base_path.clone());
 
         if path.is_file() {
-            // read kv raw serialized structure to kv_raw
-            let mut kv_raw: Vec<u8> = Vec::new();
-            File::open(path)?.read_to_end(&mut kv_raw)?;
-
-            // deserialize with bincode and return
-            let kv: Self = bincode::deserialize(&kv_raw).unwrap();
+            let migrate = Migrate::new(path);
+            let kv = migrate.migrate()?;
             Ok(kv)
         } else {
             Ok(Self::new_with_base_path(dbname, base_path))

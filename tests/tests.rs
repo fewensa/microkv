@@ -135,7 +135,7 @@ fn test_namespace_with_base_path_and_store() {
     let mut dir = env::temp_dir();
     dir.push("microkv");
 
-    let kv = MicroKV::open_with_base_path("test_namespace_with_base_path_and_store_y", dir)
+    let kv = MicroKV::open_with_base_path("test_namespace_with_base_path_and_store", dir)
         .expect("Failed to create MicroKV from a stored file or create MicroKV for this file")
         .set_auto_commit(true)
         .with_pwd_clear(TEST_PASSWORD.to_string());
