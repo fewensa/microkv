@@ -79,6 +79,8 @@ type STORAGE = Arc<RwLock<KV>>;
 /// recent state of the data store.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MicroKV {
+    /// The version of persist data. this field will help migrate
+    version: String,
     path: PathBuf,
 
     /// stores the actual key-value store encapsulated with a RwLock
@@ -110,6 +112,7 @@ impl MicroKV {
         let path = MicroKV::get_db_path_with_base_path(dbname, base_path);
 
         Self {
+            version: env!("CARGO_PKG_VERSION").to_string(),
             path,
             storage,
             nonce,
