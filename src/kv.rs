@@ -49,6 +49,7 @@
 //! ```
 #![allow(clippy::result_map_unit_fn)]
 
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -71,7 +72,8 @@ const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
 /// An alias to a base data structure that supports storing
 /// associated types. An `IndexMap` is a strong choice due to
 /// strong asymptotic performance with sorted key iteration.
-type KV = IndexMap<String, SecVec<u8>>;
+pub(crate) type KV = IndexMap<String, SecVec<u8>>;
+type STORAGE = Arc<RwLock<KV>>;
 
 /// Defines the main interface structure to represent the most
 /// recent state of the data store.
@@ -80,7 +82,7 @@ pub struct MicroKV {
     path: PathBuf,
 
     /// stores the actual key-value store encapsulated with a RwLock
-    storage: Arc<RwLock<KV>>,
+    storage: Arc<RwLock<HashMap<String, STORAGE>>>,
 
     /// pseudorandom nonce that can be publicly known
     nonce: Nonce,
@@ -96,7 +98,7 @@ pub struct MicroKV {
 impl MicroKV {
     /// New MicroKV store with store to base path
     pub fn new_with_base_path<S: AsRef<str>>(dbname: S, base_path: PathBuf) -> Self {
-        let storage = Arc::new(RwLock::new(KV::new()));
+        let storage = Arc::new(RwLock::new(HashMap::new()));
 
         // no password, until set by `with_pwd_*` methods
         let pwd: Option<SecStr> = None;
@@ -215,8 +217,17 @@ impl MicroKV {
     // extended
     ///////////////////////////////////////
 
-    pub(crate) fn storage(&self) -> &Arc<RwLock<KV>> {
-        &self.storage
+    fn safe_storage(&self, namespace: impl AsRef<str>) -> Result<()> {
+        let namespace = namespace.as_ref();
+        let mut storage_map = self.storage.write().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        if !storage_map.contains_key(namespace) {
+            let storage = Arc::new(RwLock::new(KV::new()));
+            storage_map.insert(namespace.to_string(), storage);
+        }
+        Ok(())
     }
 
     pub(crate) fn is_auto_commit(&self) -> bool {
@@ -279,11 +290,18 @@ impl MicroKV {
 
     /// Arbitrary read-lock that encapsulates a read-only closure. Multiple concurrent readers
     /// can hold a lock and parse out data.
-    pub fn lock_read<C, R>(&self, callback: C) -> Result<R>
+    pub fn lock_read<C, R>(&self, namespace: impl AsRef<str>, callback: C) -> Result<R>
     where
         C: Fn(&KV) -> R,
     {
-        let data = self.storage.read().map_err(|_| KVError {
+        let namespace = namespace.as_ref();
+        self.safe_storage(namespace)?;
+        let storage_map = self.storage.read().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        let storage = storage_map.get(namespace).unwrap();
+        let data = storage.read().map_err(|_| KVError {
             error: ErrorType::PoisonError,
             msg: None,
         })?;
@@ -292,11 +310,18 @@ impl MicroKV {
 
     /// Arbitrary write-lock that encapsulates a write-only closure Single writer can hold a
     /// lock and mutate data, blocking any other readers/writers before the lock is released.
-    pub fn lock_write<C, R>(&self, mut callback: C) -> Result<R>
+    pub fn lock_write<C, R>(&self, namespace: impl AsRef<str>, mut callback: C) -> Result<R>
     where
-        C: FnMut(&KV) -> R,
+        C: FnMut(&mut KV) -> R,
     {
-        let mut data = self.storage.write().map_err(|_| KVError {
+        let namespace = namespace.as_ref();
+        self.safe_storage(namespace)?;
+        let storage_map = self.storage.read().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        let storage = storage_map.get(namespace).unwrap();
+        let mut data = storage.write().map_err(|_| KVError {
             error: ErrorType::PoisonError,
             msg: None,
         })?;
