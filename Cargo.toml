@@ -1,7 +1,7 @@
 [package]
 name = "microkv"
 description = "a minimal and persistent key-value store designed with security in mind."
-version = "0.2.6"
+version = "0.2.7"
 
 authors = ["ex0dus-0x <ex0dus at codemuch.tech>"]
 license = "MIT"
@@ -19,6 +19,7 @@ members = ["cli"]
 [dependencies]
 bincode = "1.2.1"
 sodiumoxide = "0.2.5"
+dirs = "3"
 
 indexmap = { version = "1.3.2", features = ["serde-1"] }
 serde = { version = "1.0", features = ["rc", "derive"] }

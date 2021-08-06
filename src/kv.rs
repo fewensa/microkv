@@ -27,22 +27,44 @@
 //! // delete
 //! kv.delete("keyname").expect("cannot delete key");
 //! ```
+//!
+//! width namespace
+//!
+//! ```rust
+//! use microkv::MicroKV;
+//!
+//! let kv: MicroKV = MicroKV::new("example").with_pwd_clear("p@ssw0rd".to_string());
+//! let namespace_custom = kv.namespace("custom");
+//!
+//! // put
+//! let value = 123;
+//! namespace_custom.put("keyname", &value);
+//!
+//! // get
+//! let res: i32 = namespace_custom.get_unwrap("keyname").expect("cannot retrieve value");
+//! println!("{}", res);
+//!
+//! // delete
+//! namespace_custom.delete("keyname").expect("cannot delete key");
+//! ```
 #![allow(clippy::result_map_unit_fn)]
 
-use std::env;
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use indexmap::IndexMap;
 use secstr::{SecStr, SecVec};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sodiumoxide::crypto::hash::sha256;
-use sodiumoxide::crypto::secretbox::{self, Key, Nonce};
+use sodiumoxide::crypto::secretbox::{self, Nonce};
 
 use crate::errors::{ErrorType, KVError, Result};
+use crate::migrate::history::KV;
+use crate::migrate::{self, Migrate};
+use crate::namespace::NamespaceMicrokv;
 
 /// Defines the directory path where a key-value store
 /// (or multiple) can be interacted with.
@@ -51,32 +73,13 @@ const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
 /// An alias to a base data structure that supports storing
 /// associated types. An `IndexMap` is a strong choice due to
 /// strong asymptotic performance with sorted key iteration.
-type KV = IndexMap<String, SecVec<u8>>;
 
-/// Defines the main interface structure to represent the most
-/// recent state of the data store.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct MicroKV {
-    path: PathBuf,
-
-    /// stores the actual key-value store encapsulated with a RwLock
-    storage: Arc<RwLock<KV>>,
-
-    /// pseudorandom nonce that can be publicly known
-    nonce: Nonce,
-
-    /// memory-guarded hashed password
-    #[serde(skip_serializing, skip_deserializing)]
-    pwd: Option<SecStr>,
-
-    /// is auto commit
-    is_auto_commit: bool,
-}
+pub type MicroKV = migrate::history::MicroKV027;
 
 impl MicroKV {
     /// New MicroKV store with store to base path
     pub fn new_with_base_path<S: AsRef<str>>(dbname: S, base_path: PathBuf) -> Self {
-        let storage = Arc::new(RwLock::new(KV::new()));
+        let storage = Arc::new(RwLock::new(HashMap::new()));
 
         // no password, until set by `with_pwd_*` methods
         let pwd: Option<SecStr> = None;
@@ -88,6 +91,7 @@ impl MicroKV {
         let path = MicroKV::get_db_path_with_base_path(dbname, base_path);
 
         Self {
+            version: env!("CARGO_PKG_VERSION").to_string(),
             path,
             storage,
             nonce,
@@ -111,12 +115,8 @@ impl MicroKV {
         let path = MicroKV::get_db_path_with_base_path(dbname.as_ref(), base_path.clone());
 
         if path.is_file() {
-            // read kv raw serialized structure to kv_raw
-            let mut kv_raw: Vec<u8> = Vec::new();
-            File::open(path)?.read_to_end(&mut kv_raw)?;
-
-            // deserialize with bincode and return
-            let kv: Self = bincode::deserialize(&kv_raw).unwrap();
+            let migrate = Migrate::new(path);
+            let kv = migrate.migrate()?;
             Ok(kv)
         } else {
             Ok(Self::new_with_base_path(dbname, base_path))
@@ -135,7 +135,7 @@ impl MicroKV {
     /// Helper that retrieves the home directory by resolving $HOME
     #[inline]
     fn get_home_dir() -> PathBuf {
-        PathBuf::from(env::var("HOME").unwrap())
+        dirs::home_dir().unwrap()
     }
 
     /// Helper that forms an absolute path from a given database name and the default workspace path.
@@ -192,139 +192,74 @@ impl MicroKV {
     }
 
     ///////////////////////////////////////
+    // extended
+    ///////////////////////////////////////
+
+    fn safe_storage(&self, namespace: impl AsRef<str>) -> Result<()> {
+        let namespace = namespace.as_ref();
+        let mut storage_map = self.storage.write().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        if !storage_map.contains_key(namespace) {
+            let storage = Arc::new(RwLock::new(KV::new()));
+            storage_map.insert(namespace.to_string(), storage);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn is_auto_commit(&self) -> bool {
+        self.is_auto_commit
+    }
+
+    pub(crate) fn pwd(&self) -> &Option<SecStr> {
+        &self.pwd
+    }
+
+    pub(crate) fn nonce(&self) -> &Nonce {
+        &self.nonce
+    }
+
+    pub fn namespace(&self, namespace: impl AsRef<str>) -> NamespaceMicrokv {
+        NamespaceMicrokv::new(namespace, self)
+    }
+
+    pub fn namespace_default(&self) -> NamespaceMicrokv {
+        self.namespace("")
+    }
+
+    ///////////////////////////////////////
     // Primitive key-value store operations
     ///////////////////////////////////////
 
     /// unsafe get, may this api can change name to get_unwrap
-    pub fn get_unwrap<K: AsRef<str>, V>(&self, _key: K) -> Result<V>
+    pub fn get_unwrap<V>(&self, key: impl AsRef<str>) -> Result<V>
     where
-        V: DeserializeOwned + 'static,
+        V: Serialize + DeserializeOwned + 'static,
     {
-        if let Some(v) = self.get(_key)? {
-            return Ok(v);
-        }
-        Err(KVError {
-            error: ErrorType::KVError,
-            msg: Some("key not found in storage".to_string()),
-        })
+        self.namespace_default().get_unwrap(key)
     }
 
     /// Decrypts and retrieves a value. Can return errors if lock is poisoned,
     /// ciphertext decryption doesn't work, and if parsing bytes fail.
-    pub fn get<K: AsRef<str>, V>(&self, _key: K) -> Result<Option<V>>
+    pub fn get<V>(&self, key: impl AsRef<str>) -> Result<Option<V>>
     where
-        V: DeserializeOwned + 'static,
+        V: Serialize + DeserializeOwned + 'static,
     {
-        let key = _key.as_ref().to_string();
-        let lock = self.storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-
-        // initialize a copy of state
-        let data = lock.clone();
-
-        // retrieve value from IndexMap if stored, decrypt and return
-        match data.get(&key) {
-            Some(val) => {
-                // get value to deserialize. If password is set, retrieve the value, and decrypt it
-                // using AEAD. Otherwise just get the value and return
-                let deser_val = match &self.pwd {
-                    Some(pwd) => {
-                        // initialize key from pwd slice
-                        let key = match Key::from_slice(pwd.unsecure()) {
-                            Some(k) => k,
-                            None => {
-                                return Err(KVError {
-                                    error: ErrorType::CryptoError,
-                                    msg: Some("cannot derive key from password hash".to_string()),
-                                });
-                            }
-                        };
-
-                        // borrow secured value by reference, and decrypt before deserializing
-                        match secretbox::open(val.unsecure(), &self.nonce, &key) {
-                            Ok(r) => r,
-                            Err(_) => {
-                                return Err(KVError {
-                                    error: ErrorType::CryptoError,
-                                    msg: Some("cannot validate value being decrypted".to_string()),
-                                });
-                            }
-                        }
-                    }
-
-                    // if no password, return value as-is
-                    None => val.unsecure().to_vec(),
-                };
-
-                // finally deserialize into deserializable object to return as
-                let value: V = bincode::deserialize(&deser_val).map_err(|_| KVError {
-                    error: ErrorType::KVError,
-                    msg: Some("cannot deserialize into specified object type".to_string()),
-                })?;
-                Ok(Some(value))
-            }
-
-            None => Ok(None),
-        }
+        self.namespace_default().get(key)
     }
 
     /// Encrypts and adds a new key-value pair to storage.
-    pub fn put<K: AsRef<str>, V>(&self, _key: K, _value: &V) -> Result<()>
+    pub fn put<V>(&self, key: impl AsRef<str>, value: &V) -> Result<()>
     where
         V: Serialize,
     {
-        let key = _key.as_ref().to_string();
-        let mut data = self.storage.write().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-
-        // to retain best-case constant runtime, we remove the key-value if found
-        if data.contains_key(&key) {
-            let _ = data.remove(&key).unwrap();
-        }
-
-        // serialize the object for committing to db
-        let ser_val: Vec<u8> = bincode::serialize(&_value).unwrap();
-
-        // encrypt and secure value if password is available
-        let value: SecVec<u8> = match &self.pwd {
-            // encrypt using AEAD and secure memory
-            Some(pwd) => {
-                let key: Key = Key::from_slice(&pwd.unsecure()).unwrap();
-                SecVec::new(secretbox::seal(&ser_val, &self.nonce, &key))
-            }
-
-            // otherwise initialize secure serialized object to insert to BTreeMap
-            None => SecVec::new(ser_val),
-        };
-        data.insert(key, value);
-
-        if !self.is_auto_commit {
-            return Ok(());
-        }
-        drop(data);
-        self.commit()
+        self.namespace_default().put(key, value)
     }
 
     /// Delete removes an entry in the key value store.
-    pub fn delete<K: AsRef<str>>(&self, _key: K) -> Result<()> {
-        let key = _key.as_ref().to_string();
-        let mut data = self.storage.write().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-
-        // delete entry from BTreeMap by key
-        let _ = data.remove(&key);
-
-        if !self.is_auto_commit {
-            return Ok(());
-        }
-        drop(data);
-        self.commit()
+    pub fn delete(&self, key: impl AsRef<str>) -> Result<()> {
+        self.namespace_default().delete(key)
     }
 
     //////////////////////////////////////////
@@ -333,11 +268,18 @@ impl MicroKV {
 
     /// Arbitrary read-lock that encapsulates a read-only closure. Multiple concurrent readers
     /// can hold a lock and parse out data.
-    pub fn lock_read<C, R>(&self, callback: C) -> Result<R>
+    pub fn lock_read<C, R>(&self, namespace: impl AsRef<str>, callback: C) -> Result<R>
     where
         C: Fn(&KV) -> R,
     {
-        let data = self.storage.read().map_err(|_| KVError {
+        let namespace = namespace.as_ref();
+        self.safe_storage(namespace)?;
+        let storage_map = self.storage.read().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        let storage = storage_map.get(namespace).unwrap();
+        let data = storage.read().map_err(|_| KVError {
             error: ErrorType::PoisonError,
             msg: None,
         })?;
@@ -346,11 +288,18 @@ impl MicroKV {
 
     /// Arbitrary write-lock that encapsulates a write-only closure Single writer can hold a
     /// lock and mutate data, blocking any other readers/writers before the lock is released.
-    pub fn lock_write<C, R>(&self, mut callback: C) -> Result<R>
+    pub fn lock_write<C, R>(&self, namespace: impl AsRef<str>, mut callback: C) -> Result<R>
     where
-        C: FnMut(&KV) -> R,
+        C: FnMut(&mut KV) -> R,
     {
-        let mut data = self.storage.write().map_err(|_| KVError {
+        let namespace = namespace.as_ref();
+        self.safe_storage(namespace)?;
+        let storage_map = self.storage.read().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        let storage = storage_map.get(namespace).unwrap();
+        let mut data = storage.write().map_err(|_| KVError {
             error: ErrorType::PoisonError,
             msg: None,
         })?;
@@ -358,13 +307,8 @@ impl MicroKV {
     }
 
     /// Helper routine that acquires a reader lock and checks if a key exists.
-    pub fn exists<K: AsRef<str>>(&self, _key: K) -> Result<bool> {
-        let key = _key.as_ref().to_string();
-        let data = self.storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-        Ok(data.contains_key(&key))
+    pub fn exists(&self, key: impl AsRef<str>) -> Result<bool> {
+        self.namespace_default().exists(key)
     }
 
     /// Safely consumes an iterator over the keys in the `IndexMap` and returns a
@@ -373,15 +317,7 @@ impl MicroKV {
     /// Note that key iteration, not value iteration, is only supported in order to preserve
     /// security guarentees.
     pub fn keys(&self) -> Result<Vec<String>> {
-        let lock = self.storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-
-        // initialize a copy to data
-        let data = lock.clone();
-        let keys = data.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-        Ok(keys)
+        self.namespace_default().keys()
     }
 
     /// Safely consumes an iterator over a copy of in-place sorted keys in the
@@ -390,35 +326,14 @@ impl MicroKV {
     /// Note that key iteration, not value iteration, is only supported in order to preserve
     /// security guarentees.
     pub fn sorted_keys(&self) -> Result<Vec<String>> {
-        let lock = self.storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-
-        // initialize a copy to data, and sort keys in-place
-        let mut data = lock.clone();
-        data.sort_keys();
-        let keys = data.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-        Ok(keys)
+        self.namespace_default().sorted_keys()
     }
 
     /// Empties out the entire underlying `IndexMap` in O(n) time, but does
     /// not delete the persistent storage file from disk. The `IndexMap` remains,
     /// and its capacity is kept the same.
     pub fn clear(&self) -> Result<()> {
-        let mut data = self.storage.write().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-
-        // first, iterate over the IndexMap and coerce drop on the secure value wrappers
-        for (_, value) in data.iter_mut() {
-            value.zero_out();
-        }
-
-        // next, clear all entries from the IndexMap
-        data.clear();
-        Ok(())
+        self.namespace_default().clear()
     }
 
     ///////////////////

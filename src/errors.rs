@@ -10,10 +10,11 @@ pub type Result<T> = std::result::Result<T, KVError>;
 /// may be reached during runtime.
 #[derive(Debug)]
 pub enum ErrorType {
-    KVError,     // issues involving database interactions
-    CryptoError, // problems arisen from performing authentication encryption
-    FileError,   // unified type for io::Error
-    PoisonError, // locking error, indicating poisoned mutex
+    KVError,      // issues involving database interactions
+    CryptoError,  // problems arisen from performing authentication encryption
+    FileError,    // unified type for io::Error
+    PoisonError,  // locking error, indicating poisoned mutex
+    MigrateError, // Migrate to new microkv database
 }
 
 /// Encapsulates an ErrorType, and is what ultimately gets returned to
