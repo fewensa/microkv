@@ -51,13 +51,13 @@
 
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use secstr::{SecStr, SecVec};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sodiumoxide::crypto::hash::sha256;
 use sodiumoxide::crypto::secretbox::{self, Nonce};
 

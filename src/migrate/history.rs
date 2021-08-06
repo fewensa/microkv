@@ -5,10 +5,10 @@ use std::sync::{Arc, RwLock};
 use indexmap::IndexMap;
 use secstr::{SecStr, SecVec};
 use serde::{Deserialize, Serialize};
-use sodiumoxide::crypto::secretbox::{self, Nonce};
+use sodiumoxide::crypto::secretbox::Nonce;
 
 pub(crate) type KV = IndexMap<String, SecVec<u8>>;
-pub(crate) type STORAGE = Arc<RwLock<KV>>;
+pub(crate) type Storage = Arc<RwLock<KV>>;
 
 /// The MicroKV class version less than 0.2.7
 #[derive(Clone, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ pub struct MicroKV027 {
     pub(crate) path: PathBuf,
 
     /// stores the actual key-value store encapsulated with a RwLock
-    pub(crate) storage: Arc<RwLock<HashMap<String, STORAGE>>>,
+    pub(crate) storage: Arc<RwLock<HashMap<String, Storage>>>,
 
     /// pseudorandom nonce that can be publicly known
     pub(crate) nonce: Nonce,

@@ -7,7 +7,7 @@ use crate::MicroKV;
 
 pub mod history;
 
-const CURRENT_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct Migrate {
     path: PathBuf,
@@ -30,7 +30,7 @@ impl Migrate {
             .or_else(|_e| self.try_less_than_027(&kv_raw));
         match ret {
             Ok(v) => Ok(v),
-            Err(e) => Err(KVError {
+            Err(_e) => Err(KVError {
                 error: ErrorType::MigrateError,
                 msg: Some(format!(
                     "Not support migrate {:?} from UNKNOWN to {}",
@@ -41,14 +41,14 @@ impl Migrate {
         }
     }
 
-    fn try_current(&self, binary: &Vec<u8>) -> Result<history::MicroKV027> {
+    fn try_current(&self, binary: &[u8]) -> Result<history::MicroKV027> {
         bincode::deserialize(binary).map_err(|_e| KVError {
             error: ErrorType::MigrateError,
             msg: Some("Failed to deserialize to 0.2.7".to_string()),
         })
     }
 
-    fn try_less_than_027(&self, binary: &Vec<u8>) -> Result<MicroKV> {
+    fn try_less_than_027(&self, binary: &[u8]) -> Result<MicroKV> {
         // deserialize with bincode and return
         let kv_less_than_027: history::MicroKVLessThan027 =
             bincode::deserialize(binary).map_err(|_e| KVError {
@@ -61,8 +61,6 @@ impl Migrate {
 
 mod from_less_than_027 {
     use std::sync::{Arc, RwLock};
-
-    use sodiumoxide::crypto::secretbox::{self, Nonce};
 
     use crate::errors::{ErrorType, KVError, Result};
 
