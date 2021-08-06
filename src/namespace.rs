@@ -9,14 +9,14 @@ use crate::MicroKV;
 
 // Debug,
 #[derive(Clone)]
-pub struct NamespaceMicrokv<'a> {
+pub struct NamespaceMicroKV<'a> {
     /// namespace
     namespace: String,
     /// stores the actual key-value store encapsulated with a RwLock
     microkv: &'a MicroKV,
 }
 
-impl<'a> NamespaceMicrokv<'a> {
+impl<'a> NamespaceMicroKV<'a> {
     pub fn new(namespace: impl AsRef<str>, microkv: &'a MicroKV) -> Self {
         Self {
             namespace: namespace.as_ref().to_string(),
@@ -29,7 +29,7 @@ impl<'a> NamespaceMicrokv<'a> {
     }
 }
 
-impl<'a> NamespaceMicrokv<'a> {
+impl<'a> NamespaceMicroKV<'a> {
     /// unsafe get, may this api can change name to get_unwrap
     pub fn get_unwrap<V>(&self, key: impl AsRef<str>) -> Result<V>
     where

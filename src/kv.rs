@@ -64,7 +64,7 @@ use sodiumoxide::crypto::secretbox::{self, Nonce};
 use crate::errors::{ErrorType, KVError, Result};
 use crate::migrate::history::KV;
 use crate::migrate::{self, Migrate};
-use crate::namespace::NamespaceMicrokv;
+use crate::namespace::NamespaceMicroKV;
 
 /// Defines the directory path where a key-value store
 /// (or multiple) can be interacted with.
@@ -220,11 +220,11 @@ impl MicroKV {
         &self.nonce
     }
 
-    pub fn namespace(&self, namespace: impl AsRef<str>) -> NamespaceMicrokv {
-        NamespaceMicrokv::new(namespace, self)
+    pub fn namespace(&self, namespace: impl AsRef<str>) -> NamespaceMicroKV {
+        NamespaceMicroKV::new(namespace, self)
     }
 
-    pub fn namespace_default(&self) -> NamespaceMicrokv {
+    pub fn namespace_default(&self) -> NamespaceMicroKV {
         self.namespace("")
     }
 
