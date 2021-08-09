@@ -221,7 +221,7 @@ impl MicroKV {
     }
 
     pub fn namespace(&self, namespace: impl AsRef<str>) -> NamespaceMicroKV {
-        NamespaceMicroKV::new(namespace, self)
+        NamespaceMicroKV::new(namespace, self.clone())
     }
 
     pub fn namespace_default(&self) -> NamespaceMicroKV {
