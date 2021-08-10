@@ -10,7 +10,7 @@ use sodiumoxide::crypto::secretbox::Nonce;
 pub(crate) type KV = IndexMap<String, SecVec<u8>>;
 pub(crate) type Storage = Arc<RwLock<KV>>;
 
-/// The MicroKV class version less than 0.2.7
+/// The MicroKV class version less than 0.3.0
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MicroKVLessThan030 {
     pub(crate) path: PathBuf,
@@ -29,7 +29,7 @@ pub struct MicroKVLessThan030 {
     pub(crate) is_auto_commit: bool,
 }
 
-/// The MicroKV class version 0.2.7
+/// The MicroKV class version 0.3.0
 /// Defines the main interface structure to represent the most
 /// recent state of the data store.
 #[derive(Clone, Serialize, Deserialize)]
