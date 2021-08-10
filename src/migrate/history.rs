@@ -12,7 +12,7 @@ pub(crate) type Storage = Arc<RwLock<KV>>;
 
 /// The MicroKV class version less than 0.2.7
 #[derive(Clone, Serialize, Deserialize)]
-pub struct MicroKVLessThan027 {
+pub struct MicroKVLessThan030 {
     pub(crate) path: PathBuf,
 
     /// stores the actual key-value store encapsulated with a RwLock
