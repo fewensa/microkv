@@ -21,7 +21,7 @@
 //! kv.put("keyname", &value);
 //!
 //! // get
-//! let res: i32 = kv.get_unwrap("keyname").expect("cannot retrieve value");
+//! let res: i32 = kv.get_as_unwrap("keyname").expect("cannot retrieve value");
 //! println!("{}", res);
 //!
 //! // delete
@@ -41,7 +41,7 @@
 //! namespace_custom.put("keyname", &value);
 //!
 //! // get
-//! let res: i32 = namespace_custom.get_unwrap("keyname").expect("cannot retrieve value");
+//! let res: i32 = namespace_custom.get_as_unwrap("keyname").expect("cannot retrieve value");
 //! println!("{}", res);
 //!
 //! // delete
@@ -74,6 +74,7 @@ const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
 /// associated types. An `IndexMap` is a strong choice due to
 /// strong asymptotic performance with sorted key iteration.
 
+pub type Value = serde_json::Value;
 pub type MicroKV = migrate::history::MicroKV027;
 
 impl MicroKV {
@@ -232,20 +233,28 @@ impl MicroKV {
     // Primitive key-value store operations
     ///////////////////////////////////////
 
-    /// unsafe get, may this api can change name to get_unwrap
-    pub fn get_unwrap<V>(&self, key: impl AsRef<str>) -> Result<V>
+    pub fn get_as<V>(&self, key: impl AsRef<str>) -> Result<Option<V>>
     where
-        V: Serialize + DeserializeOwned + 'static,
+        V: DeserializeOwned + 'static,
     {
+        self.namespace_default().get_as(key)
+    }
+
+    pub fn get_as_unwrap<V>(&self, key: impl AsRef<str>) -> Result<V>
+    where
+        V: DeserializeOwned + 'static,
+    {
+        self.namespace_default().get_as_unwrap(key)
+    }
+
+    /// unsafe get, may this api can change name to get_unwrap
+    pub fn get_unwrap(&self, key: impl AsRef<str>) -> Result<Value> {
         self.namespace_default().get_unwrap(key)
     }
 
     /// Decrypts and retrieves a value. Can return errors if lock is poisoned,
     /// ciphertext decryption doesn't work, and if parsing bytes fail.
-    pub fn get<V>(&self, key: impl AsRef<str>) -> Result<Option<V>>
-    where
-        V: Serialize + DeserializeOwned + 'static,
-    {
+    pub fn get(&self, key: impl AsRef<str>) -> Result<Option<Value>> {
         self.namespace_default().get(key)
     }
 

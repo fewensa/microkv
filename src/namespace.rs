@@ -4,6 +4,7 @@ use serde::Serialize;
 use sodiumoxide::crypto::secretbox::{self, Key};
 
 use crate::errors::{ErrorType, KVError, Result};
+use crate::kv::Value;
 use crate::migrate::history::KV;
 use crate::MicroKV;
 
@@ -30,11 +31,31 @@ impl NamespaceMicroKV {
 }
 
 impl NamespaceMicroKV {
-    /// unsafe get, may this api can change name to get_unwrap
-    pub fn get_unwrap<V>(&self, key: impl AsRef<str>) -> Result<V>
+    pub fn get_as<V>(&self, key: impl AsRef<str>) -> Result<Option<V>>
     where
-        V: Serialize + DeserializeOwned + 'static,
+        V: DeserializeOwned + 'static,
     {
+        match self.get(key)? {
+            Some(v) => Ok(Some(serde_json::from_value(v)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn get_as_unwrap<V>(&self, key: impl AsRef<str>) -> Result<V>
+    where
+        V: DeserializeOwned + 'static,
+    {
+        if let Some(v) = self.get_as(key)? {
+            return Ok(v);
+        }
+        Err(KVError {
+            error: ErrorType::KVError,
+            msg: Some("key not found in storage".to_string()),
+        })
+    }
+
+    /// unsafe get, may this api can change name to get_unwrap
+    pub fn get_unwrap(&self, key: impl AsRef<str>) -> Result<Value> {
         if let Some(v) = self.get(key)? {
             return Ok(v);
         }
@@ -46,10 +67,7 @@ impl NamespaceMicroKV {
 
     /// Decrypts and retrieves a value. Can return errors if lock is poisoned,
     /// ciphertext decryption doesn't work, and if parsing bytes fail.
-    pub fn get<V>(&self, key: impl AsRef<str>) -> Result<Option<V>>
-    where
-        V: Serialize + DeserializeOwned + 'static,
-    {
+    pub fn get(&self, key: impl AsRef<str>) -> Result<Option<Value>> {
         let data_key = self.key(key);
         let value = self.microkv.lock_read(&self.namespace, |kv| {
             // initialize a copy of state
@@ -94,10 +112,14 @@ impl NamespaceMicroKV {
                     };
 
                     // finally deserialize into deserializable object to return as
-                    let value: V = bincode::deserialize(&deser_val).map_err(|_| KVError {
+                    let value: String = bincode::deserialize(&deser_val).map_err(|e| KVError {
                         error: ErrorType::KVError,
-                        msg: Some("cannot deserialize into specified object type".to_string()),
+                        msg: Some(format!(
+                            "cannot deserialize into specified object type: {:?}",
+                            e
+                        )),
                     })?;
+                    let value = serde_json::from_str(&value)?;
                     Ok(Some(value))
                 }
 
@@ -112,6 +134,7 @@ impl NamespaceMicroKV {
     where
         V: Serialize,
     {
+        let value = serde_json::to_value(value)?.to_string();
         let data_key = self.key(key);
         self.microkv.lock_write(&self.namespace, |data: &mut KV| {
             // to retain best-case constant runtime, we remove the key-value if found

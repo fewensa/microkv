@@ -10,11 +10,11 @@ pub type Result<T> = std::result::Result<T, KVError>;
 /// may be reached during runtime.
 #[derive(Debug)]
 pub enum ErrorType {
-    KVError,      // issues involving database interactions
-    CryptoError,  // problems arisen from performing authentication encryption
-    FileError,    // unified type for io::Error
-    PoisonError,  // locking error, indicating poisoned mutex
-    MigrateError, // Migrate to new microkv database
+    KVError,                      // issues involving database interactions
+    CryptoError,                  // problems arisen from performing authentication encryption
+    FileError,                    // unified type for io::Error
+    PoisonError,                  // locking error, indicating poisoned mutex
+    MigrateError(String, String), // Migrate to new microkv database
 }
 
 /// Encapsulates an ErrorType, and is what ultimately gets returned to
@@ -53,6 +53,15 @@ impl From<std::io::Error> for KVError {
     fn from(error: std::io::Error) -> Self {
         KVError {
             error: ErrorType::FileError,
+            msg: Some(error.to_string()),
+        }
+    }
+}
+
+impl From<serde_json::Error> for KVError {
+    fn from(error: serde_json::Error) -> Self {
+        KVError {
+            error: ErrorType::KVError,
             msg: Some(error.to_string()),
         }
     }

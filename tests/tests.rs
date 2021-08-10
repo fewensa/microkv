@@ -30,7 +30,7 @@ fn test_simple_integral() {
     kv.put(KEY_NAME, &value).expect("cannot insert value");
 
     // get key and validate
-    let res: u64 = kv.get_unwrap(KEY_NAME).expect("cannot retrieve value");
+    let res: u64 = kv.get_as_unwrap(KEY_NAME).expect("cannot retrieve value");
     assert_eq!(value, res);
 
     // delete value
@@ -41,7 +41,7 @@ fn test_simple_integral() {
     kv.put(KEY_NAME, &value).expect("cannot insert value");
 
     // get key and validate
-    let res: i32 = kv.get_unwrap(KEY_NAME).expect("cannot retrieve value");
+    let res: i32 = kv.get_as_unwrap(KEY_NAME).expect("cannot retrieve value");
     assert_eq!(value, res);
 }
 
@@ -54,7 +54,7 @@ fn test_simple_string() {
     kv.put(KEY_NAME, &value).expect("cannot insert value");
 
     // get key and validate
-    let res: String = kv.get_unwrap(KEY_NAME).expect("cannot retrieve value");
+    let res: String = kv.get_as_unwrap(KEY_NAME).expect("cannot retrieve value");
     assert_eq!(value, res);
 }
 
@@ -68,7 +68,7 @@ fn test_complex_struct() {
     };
     kv.put(KEY_NAME, &value).expect("cannot insert value");
 
-    let res: TestStruct = kv.get_unwrap(KEY_NAME).expect("cannot retrieve value");
+    let res: TestStruct = kv.get_as_unwrap(KEY_NAME).expect("cannot retrieve value");
     assert_eq!(value.id, res.id);
     assert_eq!(value.name, res.name);
 }
@@ -88,7 +88,7 @@ fn test_base_path_with_auto_commit() {
     kv.put(KEY_NAME, &value).expect("cannot insert value");
 
     // get key and validate
-    let res: Option<String> = kv.get(KEY_NAME).expect("cannot retrieve value");
+    let res: Option<String> = kv.get_as(KEY_NAME).expect("cannot retrieve value");
     println!("{:?}", res);
     assert_eq!(Some(value), res);
 }
@@ -124,7 +124,7 @@ fn test_multiple_thread() {
         let except_key = format!("key-thread-{}", ix);
         let except_value = format!("value-thread-{}", ix);
         let real_value: String = kv
-            .get_unwrap(except_key)
+            .get_as_unwrap(except_key)
             .expect("failed to get value from MicroKV");
         assert_eq!(real_value, except_value);
     }
@@ -147,19 +147,20 @@ fn test_namespace_with_base_path_and_store() {
 
     namespace_one.put("zoo", &"big".to_string()).unwrap();
 
-    assert_eq!(
-        Some("bar".to_string()),
-        namespace_default.get("foo").unwrap(),
-    );
-    assert_eq!(Some("gge".to_string()), kv.get("egg").unwrap());
-    let zoo_nsg_def: Option<String> = namespace_default.get("zoo").unwrap();
+    let def_foo: Option<String> = namespace_default.get_as("foo").unwrap();
+    assert_eq!(Some("bar".to_string()), def_foo,);
+    assert_eq!(Some("gge".to_string()), kv.get_as("egg").unwrap());
+    let zoo_nsg_def: Option<String> = namespace_default.get_as("zoo").unwrap();
     assert_eq!(None, zoo_nsg_def);
 
-    let foo_ns_one: Option<String> = namespace_one.get("foo").unwrap();
-    let egg_ns_one: Option<String> = namespace_one.get("egg").unwrap();
+    let foo_ns_one: Option<String> = namespace_one.get_as("foo").unwrap();
+    let egg_ns_one: Option<String> = namespace_one.get_as("egg").unwrap();
     assert_eq!(None, foo_ns_one);
     assert_eq!(None, egg_ns_one);
-    assert_eq!(Some("big".to_string()), namespace_one.get("zoo").unwrap());
+    assert_eq!(
+        Some("big".to_string()),
+        namespace_one.get_as("zoo").unwrap()
+    );
 
     let keys_df0 = kv.keys().unwrap();
     let keys_df1 = namespace_default.keys().unwrap();
