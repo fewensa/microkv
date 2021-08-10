@@ -293,7 +293,7 @@ impl MicroKV {
         let value: SecVec<u8> = match &self.pwd {
             // encrypt using AEAD and secure memory
             Some(pwd) => {
-                let key: Key = Key::from_slice(&pwd.unsecure()).unwrap();
+                let key: Key = Key::from_slice(pwd.unsecure()).unwrap();
                 SecVec::new(secretbox::seal(&ser_val, &self.nonce, &key))
             }
 
