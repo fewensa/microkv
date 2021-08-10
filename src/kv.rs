@@ -75,7 +75,7 @@ const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
 /// strong asymptotic performance with sorted key iteration.
 
 pub type Value = serde_json::Value;
-pub type MicroKV = migrate::history::MicroKV027;
+pub type MicroKV = migrate::history::MicroKV030;
 
 impl MicroKV {
     /// New MicroKV store with store to base path

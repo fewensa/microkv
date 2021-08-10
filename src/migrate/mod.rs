@@ -27,7 +27,7 @@ impl Migrate {
 
         let ret = self
             .try_current(&kv_raw)
-            .or_else(|_e| self.try_less_than_027(&kv_raw));
+            .or_else(|_e| self.try_less_than_030(&kv_raw));
         match ret {
             Ok(v) => Ok(v),
             Err(e) => match e.error {
@@ -52,18 +52,18 @@ impl Migrate {
         }
     }
 
-    fn try_current(&self, binary: &[u8]) -> Result<history::MicroKV027> {
+    fn try_current(&self, binary: &[u8]) -> Result<history::MicroKV030> {
         bincode::deserialize(binary).map_err(|_e| KVError {
-            error: ErrorType::MigrateError("0.2.7".to_string(), CURRENT_VERSION.to_string()),
-            msg: Some("Failed to deserialize to 0.2.7".to_string()),
+            error: ErrorType::MigrateError("0.3.0".to_string(), CURRENT_VERSION.to_string()),
+            msg: Some("Failed to deserialize to 0.3.0".to_string()),
         })
     }
 
-    fn try_less_than_027(&self, binary: &[u8]) -> Result<MicroKV> {
+    fn try_less_than_030(&self, _binary: &[u8]) -> Result<MicroKV> {
         Err(KVError {
-            error: ErrorType::MigrateError("<0.2.7".to_string(), CURRENT_VERSION.to_string()),
+            error: ErrorType::MigrateError("<0.3.0".to_string(), CURRENT_VERSION.to_string()),
             msg: Some(format!(
-                "Not support migrate less than 0.2.7 to {}",
+                "Not support migrate less than 0.3.0 to {}",
                 CURRENT_VERSION
             )),
         })

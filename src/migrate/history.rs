@@ -33,7 +33,7 @@ pub struct MicroKVLessThan027 {
 /// Defines the main interface structure to represent the most
 /// recent state of the data store.
 #[derive(Clone, Serialize, Deserialize)]
-pub struct MicroKV027 {
+pub struct MicroKV030 {
     /// The version of persist data. this field will help migrate
     pub(crate) version: String,
     /// The version of persist data. this field will help migrate
