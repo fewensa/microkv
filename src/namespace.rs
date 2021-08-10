@@ -4,8 +4,8 @@ use serde::Serialize;
 use sodiumoxide::crypto::secretbox::{self, Key};
 
 use crate::errors::{ErrorType, KVError, Result};
+use crate::history::KV;
 use crate::kv::Value;
-use crate::migrate::history::KV;
 use crate::MicroKV;
 
 // Debug,

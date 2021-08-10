@@ -3,9 +3,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use crate::errors::{ErrorType, KVError, Result};
-use crate::MicroKV;
-
-pub mod history;
+use crate::{history, MicroKV};
 
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 

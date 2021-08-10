@@ -15,10 +15,12 @@
 //! * Secrets management for a single-process application
 //! * License key management
 
-pub mod errors;
-pub mod kv;
-pub mod migrate;
-pub mod namespace;
-
 // re-import for accessible namespace
 pub use self::kv::MicroKV;
+
+pub mod errors;
+pub mod history;
+pub mod kv;
+pub mod namespace;
+
+mod migrate;

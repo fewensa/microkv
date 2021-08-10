@@ -62,8 +62,8 @@ use sodiumoxide::crypto::hash::sha256;
 use sodiumoxide::crypto::secretbox::{self, Nonce};
 
 use crate::errors::{ErrorType, KVError, Result};
-use crate::migrate::history::KV;
-use crate::migrate::{self, Migrate};
+use crate::history::KV;
+use crate::migrate::Migrate;
 use crate::namespace::NamespaceMicroKV;
 
 /// Defines the directory path where a key-value store
@@ -75,7 +75,7 @@ const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
 /// strong asymptotic performance with sorted key iteration.
 
 pub type Value = serde_json::Value;
-pub type MicroKV = migrate::history::MicroKV030;
+pub type MicroKV = crate::history::MicroKV030;
 
 impl MicroKV {
     /// New MicroKV store with store to base path
