@@ -221,6 +221,15 @@ impl MicroKV {
         &self.nonce
     }
 
+    pub fn namespaces(&self) -> Result<Vec<String>> {
+        let storage = self.storage.read().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        let keys = storage.keys().cloned().collect::<Vec<String>>();
+        Ok(keys)
+    }
+
     pub fn namespace(&self, namespace: impl AsRef<str>) -> NamespaceMicroKV {
         NamespaceMicroKV::new(namespace, self.clone())
     }
