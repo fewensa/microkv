@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use secstr::{SecStr, SecVec};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sodiumoxide::crypto::secretbox::Nonce;
 
@@ -36,7 +37,10 @@ impl MicroKVLess030 {
         helpers::encode_value(value, &self.pwd, &self.nonce)
     }
 
-    pub fn decode_value(&self, value: &SecVec<u8>) -> Result<serde_json::Value> {
+    pub fn decode_value<V>(&self, value: &SecVec<u8>) -> Result<V>
+    where
+        V: DeserializeOwned + 'static,
+    {
         helpers::decode_value(value, &self.pwd, &self.nonce)
     }
 

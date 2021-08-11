@@ -62,11 +62,15 @@ impl MicroKV030 {
     where
         V: Serialize,
     {
-        helpers::encode_value(value, &self.pwd, &self.nonce)
+        // all data serialize to serde_json::Value
+        let value = serde_json::to_value(value)?.to_string();
+        helpers::encode_value(&value, &self.pwd, &self.nonce)
     }
 
     pub fn decode_value(&self, value: &SecVec<u8>) -> Result<serde_json::Value> {
-        helpers::decode_value(value, &self.pwd, &self.nonce)
+        let value: String = helpers::decode_value(value, &self.pwd, &self.nonce)?;
+        let value = serde_json::from_str(&value)?;
+        Ok(value)
     }
 
     fn safe_storage(&self, namespace: impl AsRef<str>) -> Result<()> {

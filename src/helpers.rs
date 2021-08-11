@@ -64,8 +64,6 @@ pub fn encode_value<V>(value: &V, pwd: &Option<SecStr>, nonce: &Nonce) -> Result
 where
     V: Serialize,
 {
-    // all data serialize to serde_json::Value
-    let value = serde_json::to_value(value)?.to_string();
     // serialize the object for committing to db
     let ser_val: Vec<u8> = bincode::serialize(&value).unwrap();
     // encrypt and secure value if password is available
@@ -83,11 +81,10 @@ where
 }
 
 /// decode value
-pub fn decode_value(
-    value: &SecVec<u8>,
-    pwd: &Option<SecStr>,
-    nonce: &Nonce,
-) -> Result<serde_json::Value> {
+pub fn decode_value<V>(value: &SecVec<u8>, pwd: &Option<SecStr>, nonce: &Nonce) -> Result<V>
+where
+    V: DeserializeOwned + 'static,
+{
     // get value to deserialize. If password is set, retrieve the value, and decrypt it
     // using AEAD. Otherwise just get the value and return
     let deser_val = match pwd {
@@ -120,14 +117,13 @@ pub fn decode_value(
     };
 
     // finally deserialize into deserializable object to return as
-    let value: String = bincode::deserialize(&deser_val).map_err(|e| KVError {
+    let value = bincode::deserialize(&deser_val).map_err(|e| KVError {
         error: ErrorType::KVError,
         msg: Some(format!(
             "cannot deserialize into specified object type: {:?}",
             e
         )),
     })?;
-    let value = serde_json::from_str(&value)?;
     Ok(value)
 }
 
