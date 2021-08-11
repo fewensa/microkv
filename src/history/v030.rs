@@ -35,8 +35,13 @@ pub struct MicroKV030 {
 }
 
 impl MicroKV030 {
-    pub fn create(path: PathBuf, pwd: Option<SecStr>, nonce: Nonce, is_auto_commit: bool) -> Self {
-        let storage = Arc::new(RwLock::new(HashMap::new()));
+    pub fn create(
+        path: PathBuf,
+        pwd: Option<SecStr>,
+        nonce: Nonce,
+        is_auto_commit: bool,
+        storage: Arc<RwLock<HashMap<String, Storage>>>,
+    ) -> Self {
         Self {
             version: "0.3.0".to_string(),
             path,

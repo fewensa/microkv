@@ -81,14 +81,7 @@ impl MicroKV {
         // get abspath to dbname to write to.
         let path = helpers::get_db_path_with_base_path(dbname, base_path);
 
-        Self {
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            path,
-            storage,
-            nonce,
-            pwd,
-            is_auto_commit: false,
-        }
+        Self::create(path, pwd, nonce, false, storage)
     }
 
     /// Initializes a new empty and unencrypted MicroKV store with
