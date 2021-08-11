@@ -19,6 +19,7 @@
 pub use self::kv::MicroKV;
 
 pub mod errors;
+pub mod helpers;
 pub mod history;
 pub mod kv;
 pub mod namespace;

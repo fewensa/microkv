@@ -62,6 +62,7 @@ use sodiumoxide::crypto::hash::sha256;
 use sodiumoxide::crypto::secretbox::{self, Nonce};
 
 use crate::errors::{ErrorType, KVError, Result};
+use crate::helpers;
 use crate::history::KV;
 use crate::migrate::Migrate;
 use crate::namespace::NamespaceMicroKV;
@@ -69,10 +70,6 @@ use crate::namespace::NamespaceMicroKV;
 /// Defines the directory path where a key-value store
 /// (or multiple) can be interacted with.
 const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
-
-/// An alias to a base data structure that supports storing
-/// associated types. An `IndexMap` is a strong choice due to
-/// strong asymptotic performance with sorted key iteration.
 
 pub type Value = serde_json::Value;
 pub type MicroKV = crate::history::MicroKV030;
@@ -89,7 +86,7 @@ impl MicroKV {
         let nonce: Nonce = secretbox::gen_nonce();
 
         // get abspath to dbname to write to.
-        let path = MicroKV::get_db_path_with_base_path(dbname, base_path);
+        let path = helpers::get_db_path_with_base_path(dbname, base_path);
 
         Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -105,7 +102,7 @@ impl MicroKV {
     /// an identifying database name. This is the bare minimum that can operate as a
     /// key-value store, and can be configured using other builder methods.
     pub fn new<S: AsRef<str>>(dbname: S) -> Self {
-        let mut path = MicroKV::get_home_dir();
+        let mut path = helpers::get_home_dir();
         path.push(DEFAULT_WORKSPACE_PATH);
         Self::new_with_base_path(dbname, path)
     }
@@ -113,7 +110,7 @@ impl MicroKV {
     /// Open with base path
     pub fn open_with_base_path<S: AsRef<str>>(dbname: S, base_path: PathBuf) -> Result<Self> {
         // initialize abspath to persistent db
-        let path = MicroKV::get_db_path_with_base_path(dbname.as_ref(), base_path.clone());
+        let path = helpers::get_db_path_with_base_path(dbname.as_ref(), base_path.clone());
 
         if path.is_file() {
             let migrate = Migrate::new(path);
@@ -128,31 +125,9 @@ impl MicroKV {
     /// The public nonce generated from a previous session is also retrieved in order to
     /// do authenticated encryption later on.
     pub fn open<S: AsRef<str>>(dbname: S) -> Result<Self> {
-        let mut path = MicroKV::get_home_dir();
+        let mut path = helpers::get_home_dir();
         path.push(DEFAULT_WORKSPACE_PATH);
         Self::open_with_base_path(dbname, path)
-    }
-
-    /// Helper that retrieves the home directory by resolving $HOME
-    #[inline]
-    fn get_home_dir() -> PathBuf {
-        dirs::home_dir().unwrap()
-    }
-
-    /// Helper that forms an absolute path from a given database name and the default workspace path.
-    #[inline]
-    pub fn get_db_path<S: AsRef<str>>(name: S) -> PathBuf {
-        let mut path = MicroKV::get_home_dir();
-        path.push(DEFAULT_WORKSPACE_PATH);
-        Self::get_db_path_with_base_path(name, path)
-    }
-
-    /// with base path
-    #[inline]
-    pub fn get_db_path_with_base_path<S: AsRef<str>>(name: S, mut base_path: PathBuf) -> PathBuf {
-        base_path.push(name.as_ref());
-        base_path.set_extension("kv");
-        base_path
     }
 
     /*
@@ -361,8 +336,6 @@ impl MicroKV {
     /// Writes the IndexMap to persistent storage after encrypting with secure crypto construction.
     pub fn commit(&self) -> Result<()> {
         // initialize workspace directory if not exists
-        // let mut workspace_dir = MicroKV::get_home_dir();
-        // workspace_dir.push(DEFAULT_WORKSPACE_PATH);
         match self.path.parent() {
             Some(path) => {
                 if !path.is_dir() {
