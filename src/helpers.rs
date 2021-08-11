@@ -54,6 +54,11 @@ where
     })
 }
 
+/// gen nonce
+pub fn gen_nonce() -> Nonce {
+    secretbox::gen_nonce()
+}
+
 /// encode value
 pub fn encode_value<V>(value: &V, pwd: &Option<SecStr>, nonce: &Nonce) -> Result<SecVec<u8>>
 where
