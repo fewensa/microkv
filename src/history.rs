@@ -12,8 +12,8 @@ use crate::history::builder::MicroKV030Builder;
 /// An alias to a base data structure that supports storing
 /// associated types. An `IndexMap` is a strong choice due to
 /// strong asymptotic performance with sorted key iteration.
-pub(crate) type KV = IndexMap<String, SecVec<u8>>;
-pub(crate) type Storage = Arc<RwLock<KV>>;
+pub type KV = IndexMap<String, SecVec<u8>>;
+pub type Storage = Arc<RwLock<KV>>;
 
 /// The MicroKV class version less than 0.3.0
 #[derive(Clone, Serialize, Deserialize)]
