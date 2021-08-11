@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use secstr::SecStr;
+use secstr::{SecStr, SecVec};
 use serde::{Deserialize, Serialize};
-use sodiumoxide::crypto::secretbox;
 use sodiumoxide::crypto::secretbox::Nonce;
 
 use crate::errors::{ErrorType, KVError, Result};
+use crate::helpers;
 use crate::types::{Storage, KV};
 
 /// The MicroKV class version 0.3.0
@@ -34,37 +34,48 @@ pub struct MicroKV030 {
     pub(crate) is_auto_commit: bool,
 }
 
+// impl MicroKV030 {
+//     pub fn builder() -> MicroKV030Builder {
+//         MicroKV030Builder::new()
+//     }
+//
+//     pub fn version(&self) -> &String {
+//         &self.version
+//     }
+//
+//     pub fn path(&self) -> &PathBuf {
+//         &self.path
+//     }
+//
+//     pub fn storage(&self) -> &Arc<RwLock<HashMap<String, Storage>>> {
+//         &self.storage
+//     }
+//
+//     pub fn is_auto_commit(&self) -> bool {
+//         self.is_auto_commit
+//     }
+//
+//     pub fn pwd(&self) -> &Option<SecStr> {
+//         &self.pwd
+//     }
+//
+//     pub fn nonce(&self) -> &Nonce {
+//         &self.nonce
+//     }
+// }
+
 impl MicroKV030 {
-    pub fn builder() -> MicroKV030Builder {
-        MicroKV030Builder::new()
+    pub fn encode_value<V>(&self, value: &V) -> Result<SecVec<u8>>
+    where
+        V: Serialize,
+    {
+        helpers::encode_value(value, &self.pwd, &self.nonce)
     }
 
-    pub fn version(&self) -> &String {
-        &self.version
+    pub fn decode_value(&self, value: &SecVec<u8>) -> Result<serde_json::Value> {
+        helpers::decode_value(value, &self.pwd, &self.nonce)
     }
 
-    pub fn path(&self) -> &PathBuf {
-        &self.path
-    }
-
-    pub fn storage(&self) -> &Arc<RwLock<HashMap<String, Storage>>> {
-        &self.storage
-    }
-
-    pub fn is_auto_commit(&self) -> bool {
-        self.is_auto_commit
-    }
-
-    pub fn pwd(&self) -> &Option<SecStr> {
-        &self.pwd
-    }
-
-    pub fn nonce(&self) -> &Nonce {
-        &self.nonce
-    }
-}
-
-impl MicroKV030 {
     fn safe_storage(&self, namespace: impl AsRef<str>) -> Result<()> {
         let namespace = namespace.as_ref();
         let mut storage_map = self.storage.write().map_err(|_| KVError {
@@ -117,53 +128,67 @@ impl MicroKV030 {
         })?;
         Ok(callback(&mut data))
     }
-}
 
-#[derive(Clone)]
-pub struct MicroKV030Builder {
-    inner: MicroKV030,
-}
+    ///////////////////
+    // I/O Operations
+    ///////////////////
 
-impl MicroKV030Builder {
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: MicroKV030 {
-                version: "0.3.0".to_string(),
-                path: Default::default(),
-                storage: Arc::new(RwLock::new(Default::default())),
-                nonce: secretbox::gen_nonce(),
-                pwd: None,
-                is_auto_commit: false,
-            },
-        }
+    /// Writes the IndexMap to persistent storage after encrypting with secure crypto construction.
+    pub fn commit(&self) -> Result<()> {
+        helpers::persist_serialize(&self.path, self)
     }
 
-    pub fn build(&self) -> MicroKV030 {
-        self.inner.clone()
-    }
-
-    pub fn path(&mut self, path: PathBuf) -> &mut Self {
-        self.inner.path = path;
-        self
-    }
-
-    pub fn storage(&mut self, storage: HashMap<String, Storage>) -> &mut Self {
-        self.inner.storage = Arc::new(RwLock::new(storage));
-        self
-    }
-
-    pub fn nonce(&mut self, nonce: Nonce) -> &mut Self {
-        self.inner.nonce = nonce;
-        self
-    }
-
-    pub fn pwd(&mut self, pwd: Option<SecStr>) -> &mut Self {
-        self.inner.pwd = pwd;
-        self
-    }
-
-    pub fn is_auto_commit(&mut self, is_auto_commit: bool) -> &mut Self {
-        self.inner.is_auto_commit = is_auto_commit;
-        self
+    /// Clears the underlying data structure for the key-value store, and deletes the database file to remove all traces.
+    pub fn destruct(&self) -> Result<()> {
+        unimplemented!();
     }
 }
+
+// #[derive(Clone)]
+// pub struct MicroKV030Builder {
+//     inner: MicroKV030,
+// }
+//
+// impl MicroKV030Builder {
+//     pub(crate) fn new() -> Self {
+//         Self {
+//             inner: MicroKV030 {
+//                 version: "0.3.0".to_string(),
+//                 path: Default::default(),
+//                 storage: Arc::new(RwLock::new(Default::default())),
+//                 nonce: secretbox::gen_nonce(),
+//                 pwd: None,
+//                 is_auto_commit: false,
+//             },
+//         }
+//     }
+//
+//     pub fn build(&self) -> MicroKV030 {
+//         self.inner.clone()
+//     }
+//
+//     pub fn path(&mut self, path: PathBuf) -> &mut Self {
+//         self.inner.path = path;
+//         self
+//     }
+//
+//     pub fn storage(&mut self, storage: HashMap<String, Storage>) -> &mut Self {
+//         self.inner.storage = Arc::new(RwLock::new(storage));
+//         self
+//     }
+//
+//     pub fn nonce(&mut self, nonce: Nonce) -> &mut Self {
+//         self.inner.nonce = nonce;
+//         self
+//     }
+//
+//     pub fn pwd(&mut self, pwd: Option<SecStr>) -> &mut Self {
+//         self.inner.pwd = pwd;
+//         self
+//     }
+//
+//     pub fn is_auto_commit(&mut self, is_auto_commit: bool) -> &mut Self {
+//         self.inner.is_auto_commit = is_auto_commit;
+//         self
+//     }
+// }

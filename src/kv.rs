@@ -50,9 +50,7 @@
 #![allow(clippy::result_map_unit_fn)]
 
 use std::collections::HashMap;
-use std::fs::{self, File, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use secstr::{SecStr, SecVec};
@@ -257,43 +255,6 @@ impl MicroKV {
     /// and its capacity is kept the same.
     pub fn clear(&self) -> Result<()> {
         self.namespace_default().clear()
-    }
-
-    ///////////////////
-    // I/O Operations
-    ///////////////////
-
-    /// Writes the IndexMap to persistent storage after encrypting with secure crypto construction.
-    pub fn commit(&self) -> Result<()> {
-        // initialize workspace directory if not exists
-        match self.path.parent() {
-            Some(path) => {
-                if !path.is_dir() {
-                    fs::create_dir_all(path)?;
-                }
-            }
-            None => {
-                return Err(KVError {
-                    error: ErrorType::FileError,
-                    msg: Some("The store file parent path isn't sound".to_string()),
-                });
-            }
-        }
-
-        // check if path to db exists, if not create it
-        let path = Path::new(&self.path);
-        let mut file: File = OpenOptions::new().write(true).create(true).open(path)?;
-
-        // acquire a file lock that unlocks at the end of scope
-        // let _file_lock = Arc::new(Mutex::new(0));
-        let ser = bincode::serialize(self).unwrap();
-        file.write_all(&ser)?;
-        Ok(())
-    }
-
-    /// Clears the underlying data structure for the key-value store, and deletes the database file to remove all traces.
-    pub fn destruct(&self) -> Result<()> {
-        unimplemented!();
     }
 }
 

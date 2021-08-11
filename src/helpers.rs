@@ -1,13 +1,14 @@
-use std::path::PathBuf;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
-use crate::errors::{ErrorType, KVError};
 use secstr::{SecStr, SecVec};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sodiumoxide::crypto::secretbox::Nonce;
 use sodiumoxide::crypto::secretbox::{self, Key};
-use std::fs::File;
-use std::io::Read;
+
+use crate::errors::{ErrorType, KVError, Result};
 
 /// Defines the directory path where a key-value store
 /// (or multiple) can be interacted with.
@@ -37,7 +38,7 @@ pub fn get_db_path_with_base_path<S: AsRef<str>>(name: S, mut base_path: PathBuf
 
 /// read file and deserialize use bincode
 #[inline]
-pub fn read_file_and_deserialize_bincode<V>(path: &PathBuf) -> crate::errors::Result<V>
+pub fn read_file_and_deserialize_bincode<V>(path: &PathBuf) -> Result<V>
 where
     V: DeserializeOwned + 'static,
 {
@@ -54,11 +55,7 @@ where
 }
 
 /// encode value
-pub fn encode_value<V>(
-    value: &V,
-    pwd: &Option<SecStr>,
-    nonce: &Nonce,
-) -> crate::errors::Result<SecVec<u8>>
+pub fn encode_value<V>(value: &V, pwd: &Option<SecStr>, nonce: &Nonce) -> Result<SecVec<u8>>
 where
     V: Serialize,
 {
@@ -85,7 +82,7 @@ pub fn decode_value(
     value: &SecVec<u8>,
     pwd: &Option<SecStr>,
     nonce: &Nonce,
-) -> crate::errors::Result<serde_json::Value> {
+) -> Result<serde_json::Value> {
     // get value to deserialize. If password is set, retrieve the value, and decrypt it
     // using AEAD. Otherwise just get the value and return
     let deser_val = match pwd {
@@ -127,4 +124,35 @@ pub fn decode_value(
     })?;
     let value = serde_json::from_str(&value)?;
     Ok(value)
+}
+
+/// Writes the IndexMap to persistent storage after encrypting with secure crypto construction.
+pub(crate) fn persist_serialize<S>(path: &PathBuf, object: &S) -> Result<()>
+where
+    S: Serialize,
+{
+    // initialize workspace directory if not exists
+    match path.parent() {
+        Some(path) => {
+            if !path.is_dir() {
+                std::fs::create_dir_all(path)?;
+            }
+        }
+        None => {
+            return Err(KVError {
+                error: ErrorType::FileError,
+                msg: Some("The store file parent path isn't sound".to_string()),
+            });
+        }
+    }
+
+    // check if path to db exists, if not create it
+    let path = Path::new(path);
+    let mut file: File = OpenOptions::new().write(true).create(true).open(path)?;
+
+    // acquire a file lock that unlocks at the end of scope
+    // let _file_lock = Arc::new(Mutex::new(0));
+    let ser = bincode::serialize(object).unwrap();
+    file.write_all(&ser)?;
+    Ok(())
 }

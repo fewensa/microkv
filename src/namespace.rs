@@ -4,9 +4,8 @@ use serde::Serialize;
 use crate::errors::{ErrorType, KVError, Result};
 use crate::kv::Value;
 use crate::types::KV;
-use crate::{helpers, MicroKV};
+use crate::MicroKV;
 
-// Debug,
 #[derive(Clone)]
 pub struct NamespaceMicroKV {
     /// namespace
@@ -74,12 +73,10 @@ impl NamespaceMicroKV {
             // retrieve value from IndexMap if stored, decrypt and return
             match data.get(&data_key) {
                 Some(val) => {
-                    let v =
-                        match helpers::decode_value(&val, self.microkv.pwd(), self.microkv.nonce())
-                        {
-                            Ok(v) => v,
-                            Err(e) => return Err(e),
-                        };
+                    let v = match self.microkv.decode_value(&val) {
+                        Ok(v) => v,
+                        Err(e) => return Err(e),
+                    };
                     Ok(Some(v))
                 }
 
@@ -101,15 +98,14 @@ impl NamespaceMicroKV {
                 let _ = data.remove(&data_key).unwrap();
             }
 
-            let value = match helpers::encode_value(value, self.microkv.pwd(), self.microkv.nonce())
-            {
+            let value = match self.microkv.encode_value(value) {
                 Ok(v) => v,
                 Err(e) => return Err(e),
             };
             data.insert(data_key.clone(), value);
             Ok(())
         })??;
-        if !self.microkv.is_auto_commit() {
+        if !self.microkv.is_auto_commit {
             return Ok(());
         }
         self.microkv.commit()
@@ -123,7 +119,7 @@ impl NamespaceMicroKV {
             let _ = data.remove(&data_key);
         })?;
 
-        if !self.microkv.is_auto_commit() {
+        if !self.microkv.is_auto_commit {
             return Ok(());
         }
         self.microkv.commit()
@@ -180,7 +176,7 @@ impl NamespaceMicroKV {
         })?;
 
         // auto commit
-        if !self.microkv.is_auto_commit() {
+        if !self.microkv.is_auto_commit {
             return Ok(());
         }
         self.microkv.commit()
