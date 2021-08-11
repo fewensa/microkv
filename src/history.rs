@@ -75,6 +75,7 @@ pub mod builder {
 
     use crate::history::{MicroKV030, MicroKVLessThan030, Storage, KV};
 
+    #[derive(Clone, Serialize, Deserialize)]
     pub struct MicroKVLessThan030Builder {
         inner: MicroKVLessThan030,
     }
@@ -122,6 +123,7 @@ pub mod builder {
         }
     }
 
+    #[derive(Clone, Serialize, Deserialize)]
     pub struct MicroKV030Builder {
         inner: MicroKV030,
     }
