@@ -23,5 +23,6 @@ pub mod helpers;
 pub mod history;
 pub mod kv;
 pub mod namespace;
+pub mod types;
 
 mod migrate;

@@ -63,7 +63,6 @@ use sodiumoxide::crypto::secretbox::{self, Nonce};
 
 use crate::errors::{ErrorType, KVError, Result};
 use crate::helpers;
-use crate::history::KV;
 use crate::migrate::Migrate;
 use crate::namespace::NamespaceMicroKV;
 
@@ -167,19 +166,6 @@ impl MicroKV {
     // extended
     ///////////////////////////////////////
 
-    fn safe_storage(&self, namespace: impl AsRef<str>) -> Result<()> {
-        let namespace = namespace.as_ref();
-        let mut storage_map = self.storage.write().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-        if !storage_map.contains_key(namespace) {
-            let storage = Arc::new(RwLock::new(KV::new()));
-            storage_map.insert(namespace.to_string(), storage);
-        }
-        Ok(())
-    }
-
     pub fn namespaces(&self) -> Result<Vec<String>> {
         let storage = self.storage.read().map_err(|_| KVError {
             error: ErrorType::PoisonError,
@@ -242,46 +228,6 @@ impl MicroKV {
     //////////////////////////////////////////
     // Other key-value store helper operations
     //////////////////////////////////////////
-
-    /// Arbitrary read-lock that encapsulates a read-only closure. Multiple concurrent readers
-    /// can hold a lock and parse out data.
-    pub fn lock_read<C, R>(&self, namespace: impl AsRef<str>, callback: C) -> Result<R>
-    where
-        C: Fn(&KV) -> R,
-    {
-        let namespace = namespace.as_ref();
-        self.safe_storage(namespace)?;
-        let storage_map = self.storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-        let storage = storage_map.get(namespace).unwrap();
-        let data = storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-        Ok(callback(&data))
-    }
-
-    /// Arbitrary write-lock that encapsulates a write-only closure Single writer can hold a
-    /// lock and mutate data, blocking any other readers/writers before the lock is released.
-    pub fn lock_write<C, R>(&self, namespace: impl AsRef<str>, mut callback: C) -> Result<R>
-    where
-        C: FnMut(&mut KV) -> R,
-    {
-        let namespace = namespace.as_ref();
-        self.safe_storage(namespace)?;
-        let storage_map = self.storage.read().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-        let storage = storage_map.get(namespace).unwrap();
-        let mut data = storage.write().map_err(|_| KVError {
-            error: ErrorType::PoisonError,
-            msg: None,
-        })?;
-        Ok(callback(&mut data))
-    }
 
     /// Helper routine that acquires a reader lock and checks if a key exists.
     pub fn exists(&self, key: impl AsRef<str>) -> Result<bool> {

@@ -2,8 +2,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::errors::{ErrorType, KVError, Result};
-use crate::history::KV;
 use crate::kv::Value;
+use crate::types::KV;
 use crate::{helpers, MicroKV};
 
 // Debug,
