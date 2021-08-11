@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 
+/// Defines the directory path where a key-value store
+/// (or multiple) can be interacted with.
+pub(crate) const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
+
 /// Helper that retrieves the home directory by resolving $HOME
 #[inline]
 pub fn get_home_dir() -> PathBuf {
@@ -9,7 +13,7 @@ pub fn get_home_dir() -> PathBuf {
 /// Helper that forms an absolute path from a given database name and the default workspace path.
 #[inline]
 pub fn get_db_path<S: AsRef<str>>(name: S) -> PathBuf {
-    let mut path = MicroKV::get_home_dir();
+    let mut path = get_home_dir();
     path.push(DEFAULT_WORKSPACE_PATH);
     get_db_path_with_base_path(name, path)
 }

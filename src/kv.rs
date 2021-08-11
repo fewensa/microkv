@@ -67,10 +67,6 @@ use crate::history::KV;
 use crate::migrate::Migrate;
 use crate::namespace::NamespaceMicroKV;
 
-/// Defines the directory path where a key-value store
-/// (or multiple) can be interacted with.
-const DEFAULT_WORKSPACE_PATH: &str = ".microkv/";
-
 pub type Value = serde_json::Value;
 pub type MicroKV = crate::history::MicroKV030;
 
@@ -103,7 +99,7 @@ impl MicroKV {
     /// key-value store, and can be configured using other builder methods.
     pub fn new<S: AsRef<str>>(dbname: S) -> Self {
         let mut path = helpers::get_home_dir();
-        path.push(DEFAULT_WORKSPACE_PATH);
+        path.push(helpers::DEFAULT_WORKSPACE_PATH);
         Self::new_with_base_path(dbname, path)
     }
 
@@ -126,7 +122,7 @@ impl MicroKV {
     /// do authenticated encryption later on.
     pub fn open<S: AsRef<str>>(dbname: S) -> Result<Self> {
         let mut path = helpers::get_home_dir();
-        path.push(DEFAULT_WORKSPACE_PATH);
+        path.push(helpers::DEFAULT_WORKSPACE_PATH);
         Self::open_with_base_path(dbname, path)
     }
 
@@ -182,18 +178,6 @@ impl MicroKV {
             storage_map.insert(namespace.to_string(), storage);
         }
         Ok(())
-    }
-
-    pub(crate) fn is_auto_commit(&self) -> bool {
-        self.is_auto_commit
-    }
-
-    pub(crate) fn pwd(&self) -> &Option<SecStr> {
-        &self.pwd
-    }
-
-    pub(crate) fn nonce(&self) -> &Nonce {
-        &self.nonce
     }
 
     pub fn namespaces(&self) -> Result<Vec<String>> {

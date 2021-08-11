@@ -7,7 +7,7 @@ use secstr::{SecStr, SecVec};
 use serde::{Deserialize, Serialize};
 use sodiumoxide::crypto::secretbox::Nonce;
 
-use crate::history::builder::MicroKV030Builder;
+use crate::history::builder::{MicroKV030Builder, MicroKVLessThan030Builder};
 
 /// An alias to a base data structure that supports storing
 /// associated types. An `IndexMap` is a strong choice due to
@@ -32,6 +32,32 @@ pub struct MicroKVLessThan030 {
 
     /// is auto commit
     pub(crate) is_auto_commit: bool,
+}
+
+impl MicroKVLessThan030 {
+    pub fn builder() -> MicroKVLessThan030Builder {
+        MicroKVLessThan030Builder::new()
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    pub fn storage(&self) -> &Arc<RwLock<KV>> {
+        &self.storage
+    }
+
+    pub fn is_auto_commit(&self) -> bool {
+        self.is_auto_commit
+    }
+
+    pub fn pwd(&self) -> &Option<SecStr> {
+        &self.pwd
+    }
+
+    pub fn nonce(&self) -> &Nonce {
+        &self.nonce
+    }
 }
 
 /// The MicroKV class version 0.3.0
@@ -62,6 +88,30 @@ impl MicroKV030 {
     pub fn builder() -> MicroKV030Builder {
         MicroKV030Builder::new()
     }
+
+    pub fn version(&self) -> &String {
+        &self.version
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    pub fn storage(&self) -> &Arc<RwLock<HashMap<String, Storage>>> {
+        &self.storage
+    }
+
+    pub fn is_auto_commit(&self) -> bool {
+        self.is_auto_commit
+    }
+
+    pub fn pwd(&self) -> &Option<SecStr> {
+        &self.pwd
+    }
+
+    pub fn nonce(&self) -> &Nonce {
+        &self.nonce
+    }
 }
 
 pub mod builder {
@@ -69,13 +119,13 @@ pub mod builder {
     use std::path::PathBuf;
     use std::sync::{Arc, RwLock};
 
-    use secstr::{SecStr, SecVec};
+    use secstr::SecStr;
     use sodiumoxide::crypto::secretbox;
     use sodiumoxide::crypto::secretbox::Nonce;
 
     use crate::history::{MicroKV030, MicroKVLessThan030, Storage, KV};
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone)]
     pub struct MicroKVLessThan030Builder {
         inner: MicroKVLessThan030,
     }
@@ -123,7 +173,7 @@ pub mod builder {
         }
     }
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone)]
     pub struct MicroKV030Builder {
         inner: MicroKV030,
     }
