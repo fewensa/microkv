@@ -3,7 +3,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use crate::errors::{ErrorType, KVError, Result};
-use crate::{history, MicroKV};
+use crate::{helpers, history, MicroKV};
 
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -19,13 +19,7 @@ impl Migrate {
 
 impl Migrate {
     pub fn migrate(&self) -> Result<MicroKV> {
-        // read kv raw serialized structure to kv_raw
-        let mut kv_raw: Vec<u8> = Vec::new();
-        File::open(&self.path)?.read_to_end(&mut kv_raw)?;
-
-        let ret = self
-            .try_current(&kv_raw)
-            .or_else(|_e| self.try_less_than_030(&kv_raw));
+        let ret = self.try_current().or_else(|_e| self.try_less_than_030());
         match ret {
             Ok(v) => Ok(v),
             Err(e) => match e.error {
@@ -50,14 +44,14 @@ impl Migrate {
         }
     }
 
-    fn try_current(&self, binary: &[u8]) -> Result<history::MicroKV030> {
-        bincode::deserialize(binary).map_err(|_e| KVError {
+    fn try_current(&self) -> Result<history::MicroKV030> {
+        helpers::read_file_and_deserialize_bincode(&self.path).map_err(|e| KVError {
             error: ErrorType::MigrateError("0.3.0".to_string(), CURRENT_VERSION.to_string()),
-            msg: Some("Failed to deserialize to 0.3.0".to_string()),
+            msg: Some(format!("Failed to deserialize to 0.3.0 -> {:?}", e)),
         })
     }
 
-    fn try_less_than_030(&self, _binary: &[u8]) -> Result<MicroKV> {
+    fn try_less_than_030(&self) -> Result<MicroKV> {
         Err(KVError {
             error: ErrorType::MigrateError("<0.3.0".to_string(), CURRENT_VERSION.to_string()),
             msg: Some(format!(

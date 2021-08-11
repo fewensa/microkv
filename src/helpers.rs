@@ -2,9 +2,12 @@ use std::path::PathBuf;
 
 use crate::errors::{ErrorType, KVError};
 use secstr::{SecStr, SecVec};
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sodiumoxide::crypto::secretbox::Nonce;
 use sodiumoxide::crypto::secretbox::{self, Key};
+use std::fs::File;
+use std::io::Read;
 
 /// Defines the directory path where a key-value store
 /// (or multiple) can be interacted with.
@@ -30,6 +33,24 @@ pub fn get_db_path_with_base_path<S: AsRef<str>>(name: S, mut base_path: PathBuf
     base_path.push(name.as_ref());
     base_path.set_extension("kv");
     base_path
+}
+
+/// read file and deserialize use bincode
+#[inline]
+pub fn read_file_and_deserialize_bincode<V>(path: &PathBuf) -> crate::errors::Result<V>
+where
+    V: DeserializeOwned + 'static,
+{
+    // read kv raw serialized structure to kv_raw
+    let mut kv_raw: Vec<u8> = Vec::new();
+    File::open(path)?.read_to_end(&mut kv_raw)?;
+    bincode::deserialize(&kv_raw).map_err(|_e| KVError {
+        error: ErrorType::FileError,
+        msg: Some(format!(
+            "Failed read file {:?} an deserialize use bincode",
+            path
+        )),
+    })
 }
 
 /// encode value
