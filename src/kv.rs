@@ -100,7 +100,7 @@ impl MicroKV {
 
         if path.is_file() {
             let migrate = Migrate::new(path.clone());
-            let kv = migrate.migrate()?;
+            let mut kv = migrate.migrate()?;
             kv.path = path;
             kv.commit()?;
             Ok(kv)
