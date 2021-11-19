@@ -99,8 +99,10 @@ impl MicroKV {
         let path = helpers::get_db_path_with_base_path(dbname.as_ref(), base_path.clone());
 
         if path.is_file() {
-            let migrate = Migrate::new(path);
+            let migrate = Migrate::new(path.clone());
             let kv = migrate.migrate()?;
+            kv.path = path;
+            kv.commit()?;
             Ok(kv)
         } else {
             Ok(Self::new_with_base_path(dbname, base_path))
