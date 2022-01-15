@@ -136,6 +136,7 @@ impl MicroKV030 {
         if self.is_auto_commit {
             self.commit()?;
         }
+        drop(storage_map);
         Ok(())
     }
 
