@@ -134,9 +134,9 @@ impl MicroKV030 {
         })?;
         let _ = storage_map.remove(namespace.as_ref());
         if self.is_auto_commit {
+            drop(storage_map);
             self.commit()?;
         }
-        drop(storage_map);
         Ok(())
     }
 
