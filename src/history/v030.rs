@@ -126,6 +126,19 @@ impl MicroKV030 {
         Ok(callback(&mut data))
     }
 
+    /// Delete namespace
+    pub fn delete_namespace(&self, namespace: impl AsRef<str>) -> Result<()> {
+        let mut storage_map = self.storage.write().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        let _ = storage_map.remove(namespace.as_ref());
+        if self.is_auto_commit {
+            self.commit()?;
+        }
+        Ok(())
+    }
+
     ///////////////////
     // I/O Operations
     ///////////////////
