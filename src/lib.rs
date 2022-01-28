@@ -26,3 +26,4 @@ pub mod namespace;
 pub mod types;
 
 mod migrate;
+mod reload;

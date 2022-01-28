@@ -155,6 +155,12 @@ impl MicroKV {
         self
     }
 
+    /// Set enable reload
+    pub fn set_enable_reload(self) -> Self {
+        self.enable_reload();
+        self
+    }
+
     ///////////////////////////////////////
     // extended
     ///////////////////////////////////////

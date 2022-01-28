@@ -8,6 +8,7 @@ use sodiumoxide::crypto::secretbox::Nonce;
 
 use crate::errors::{ErrorType, KVError, Result};
 use crate::helpers;
+use crate::reload::WatchAndReload;
 use crate::types::{Storage, KV};
 
 /// The MicroKV class version 0.3.0
@@ -152,5 +153,37 @@ impl MicroKV030 {
     /// Clears the underlying data structure for the key-value store, and deletes the database file to remove all traces.
     pub fn destruct(&self) -> Result<()> {
         unimplemented!();
+    }
+
+    ///////////////////
+    // Additional
+    ///////////////////
+
+    pub(crate) fn enable_reload(&self) {
+        WatchAndReload::start(self.clone());
+    }
+
+    /// Merge other MicroKV instance
+    pub(crate) fn replace(&self, other: Self) -> Result<()> {
+        let nss = other.namespaces()?;
+        for ns in nss {
+            let tns = self.namespaces()?;
+            if !tns.contains(&ns) {
+                self.delete_namespace(&ns)?;
+                continue;
+            }
+            let o_nkv = other.namespace(&ns);
+            let t_nkv = self.namespace(ns);
+            let keys = o_nkv.keys()?;
+            for key in keys {
+                if let Some(value) = o_nkv.get(&key)? {
+                    t_nkv.put(&key, &value)?;
+                } else {
+                    t_nkv.delete(&key)?;
+                }
+            }
+        }
+        self.commit()?;
+        Ok(())
     }
 }
