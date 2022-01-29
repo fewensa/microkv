@@ -16,7 +16,6 @@ pub enum ErrorType {
     FileError,                    // unified type for io::Error
     PoisonError,                  // locking error, indicating poisoned mutex
     MigrateError(String, String), // Migrate to new microkv database
-    WatchError,
 }
 
 /// Encapsulates an ErrorType, and is what ultimately gets returned to
@@ -70,22 +69,3 @@ impl From<serde_json::Error> for KVError {
 }
 
 impl Error for KVError {}
-
-impl From<notify::Error> for KVError {
-    fn from(error: notify::Error) -> Self {
-        let msg = match error {
-            notify::Error::Generic(msg) => format!("[Generic] {}", msg),
-            notify::Error::Io(e) => format!("[Io] {:?}", e),
-            notify::Error::PathNotFound => {
-                "[PathNotFound] The provided path does not exist".to_string()
-            }
-            notify::Error::WatchNotFound => {
-                "[WatchNotFound] Attempted to remove a watch that does not exist".to_string()
-            }
-        };
-        KVError {
-            error: ErrorType::WatchError,
-            msg: Some(msg),
-        }
-    }
-}
