@@ -8,7 +8,6 @@ use sodiumoxide::crypto::secretbox::Nonce;
 
 use crate::errors::{ErrorType, KVError, Result};
 use crate::helpers;
-use crate::reload::WatchAndReload;
 use crate::types::{Storage, KV};
 
 /// The MicroKV class version 0.3.0
@@ -75,6 +74,7 @@ impl MicroKV030 {
     }
 
     fn safe_storage(&self, namespace: impl AsRef<str>) -> Result<()> {
+        self.reload()?;
         let namespace = namespace.as_ref();
         let mut storage_map = self.storage.write().map_err(|_| KVError {
             error: ErrorType::PoisonError,
@@ -93,6 +93,7 @@ impl MicroKV030 {
     where
         C: Fn(&KV) -> R,
     {
+        self.reload()?;
         let namespace = namespace.as_ref();
         self.safe_storage(namespace)?;
         let storage_map = self.storage.read().map_err(|_| KVError {
@@ -113,6 +114,7 @@ impl MicroKV030 {
     where
         C: FnMut(&mut KV) -> R,
     {
+        self.reload()?;
         let namespace = namespace.as_ref();
         self.safe_storage(namespace)?;
         let storage_map = self.storage.read().map_err(|_| KVError {
@@ -129,6 +131,7 @@ impl MicroKV030 {
 
     /// Delete namespace
     pub fn delete_namespace(&self, namespace: impl AsRef<str>) -> Result<()> {
+        self.reload()?;
         let mut storage_map = self.storage.write().map_err(|_| KVError {
             error: ErrorType::PoisonError,
             msg: None,
@@ -159,31 +162,41 @@ impl MicroKV030 {
     // Additional
     ///////////////////
 
-    pub(crate) fn enable_reload(&self) {
-        WatchAndReload::start(self.clone());
-    }
-
     /// Merge other MicroKV instance
-    pub(crate) fn replace(&self, other: Self) -> Result<()> {
-        let nss = other.namespaces()?;
-        for ns in nss {
-            let tns = self.namespaces()?;
-            if !tns.contains(&ns) {
-                self.delete_namespace(&ns)?;
-                continue;
-            }
-            let o_nkv = other.namespace(&ns);
-            let t_nkv = self.namespace(ns);
-            let keys = o_nkv.keys()?;
-            for key in keys {
-                if let Some(value) = o_nkv.get(&key)? {
-                    t_nkv.put(&key, &value)?;
-                } else {
-                    t_nkv.delete(&key)?;
-                }
+    pub(crate) fn reload(&self) -> Result<()> {
+        let other: Self = match helpers::read_file_and_deserialize_bincode(&self.path).ok() {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+        let c_ns = self.namespaces()?;
+        let o_ns = other.namespaces()?;
+        let removed_ns = c_ns
+            .iter()
+            .filter(|&item| !o_ns.contains(item))
+            .collect::<Vec<&String>>();
+        let o_storage_read = other.storage.read().map_err(|_| KVError {
+            error: ErrorType::PoisonError,
+            msg: None,
+        })?;
+        for ns in o_ns {
+            if let Some(kv) = o_storage_read.get(&ns) {
+                let mut c_storage_write = self.storage.write().map_err(|_| KVError {
+                    error: ErrorType::PoisonError,
+                    msg: None,
+                })?;
+                c_storage_write.insert(ns.to_string(), kv.clone());
+                drop(c_storage_write);
             }
         }
-        self.commit()?;
+        for rns in removed_ns {
+            let mut c_storage_write = self.storage.write().map_err(|_| KVError {
+                error: ErrorType::PoisonError,
+                msg: None,
+            })?;
+            c_storage_write.remove(rns);
+            drop(c_storage_write);
+        }
+        drop(o_storage_read);
         Ok(())
     }
 }

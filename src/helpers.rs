@@ -1,7 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use secstr::{SecStr, SecVec};
 use serde::de::DeserializeOwned;
@@ -148,49 +147,13 @@ where
         }
     }
 
-    let path_lock = std::env::temp_dir().join("microkv.lock");
-    if !path_lock.is_file() {
-        std::fs::remove_dir_all(&path_lock)?;
-    }
-    loop {
-        let start = SystemTime::now();
-        let now = start
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| KVError {
-                error: ErrorType::Custom,
-                msg: Some("Time went backwards".to_string()),
-            })?
-            .as_millis();
-        if path_lock.exists() {
-            let lock_content = std::fs::read_to_string(&path_lock)?;
-            let lock_content = lock_content.replace(' ', "");
-            if let Some(ts) = lock_content.parse::<u128>().ok() {
-                // Max lock time 2 minutes
-                if now - ts > 1000 * 60 * 2 {
-                    std::fs::remove_file(&path_lock)?;
-                    continue;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                continue;
-            } else {
-                std::fs::write(&path_lock, now.to_string())?;
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                continue;
-            }
-        }
-        std::fs::write(&path_lock, now.to_string())?;
-        break;
-    }
-
     // check if path to db exists, if not create it
-    let path_db = Path::new(path);
-    let mut file: File = OpenOptions::new().write(true).create(true).open(path_db)?;
+    let path = Path::new(path);
+    let mut file: File = OpenOptions::new().write(true).create(true).open(path)?;
 
     // acquire a file lock that unlocks at the end of scope
     // let _file_lock = Arc::new(Mutex::new(0));
     let ser = bincode::serialize(object).unwrap();
     file.write_all(&ser)?;
-
-    std::fs::remove_file(&path_lock)?;
     Ok(())
 }
