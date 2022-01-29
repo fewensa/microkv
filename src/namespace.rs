@@ -73,7 +73,7 @@ impl NamespaceMicroKV {
             // retrieve value from IndexMap if stored, decrypt and return
             match data.get(&data_key) {
                 Some(val) => {
-                    let v = match self.microkv.decode_value(&val) {
+                    let v = match self.microkv.decode_value(val) {
                         Ok(v) => v,
                         Err(e) => return Err(e),
                     };

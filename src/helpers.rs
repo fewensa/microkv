@@ -38,7 +38,7 @@ pub fn get_db_path_with_base_path<S: AsRef<str>>(name: S, mut base_path: PathBuf
 
 /// read file and deserialize use bincode
 #[inline]
-pub fn read_file_and_deserialize_bincode<V>(path: &PathBuf) -> Result<V>
+pub fn read_file_and_deserialize_bincode<V>(path: &Path) -> Result<V>
 where
     V: DeserializeOwned + 'static,
 {
@@ -128,7 +128,7 @@ where
 }
 
 /// Writes the IndexMap to persistent storage after encrypting with secure crypto construction.
-pub(crate) fn persist_serialize<S>(path: &PathBuf, object: &S) -> Result<()>
+pub(crate) fn persist_serialize<S>(path: &Path, object: &S) -> Result<()>
 where
     S: Serialize,
 {
